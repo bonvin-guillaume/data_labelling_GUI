@@ -57,6 +57,9 @@ Optional arguments:
 
 - Select a day in the left panel.
 - Use the file list in the left panel to jump directly to any specific image/time.
+- Bulk labeling: use `Shift` or `Cmd/Ctrl` in the file list to select multiple images, then press `1`, `2`, or `3` to apply one label to all selected files.
+- Bulk unlabel: select multiple files and press `U` (or click **Unlabel**) to remove labels for all selected files.
+- If any selected images are already labeled, the app asks for confirmation before overwriting.
 - Navigate images with:
   - `Left` / `Right` arrows
 - Apply labels with:

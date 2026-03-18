@@ -3,9 +3,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QItemSelectionModel, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPixmap, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QCheckBox,
     QFileDialog,
@@ -81,6 +82,7 @@ class LabelingMainWindow(QMainWindow):
 
         left_layout.addWidget(QLabel("Files in selected day"))
         self.file_list = QListWidget()
+        self.file_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.file_list.currentItemChanged.connect(self._on_file_changed)
         left_layout.addWidget(self.file_list, stretch=1)
         splitter.addWidget(left)
@@ -217,7 +219,7 @@ class LabelingMainWindow(QMainWindow):
         self._refresh_file_list(preferred_path=preferred_path)
         self._refresh_progress()
 
-    def _refresh_file_list(self, preferred_path: str | None) -> None:
+    def _refresh_file_list(self, preferred_path: str | None, preferred_paths: list[str] | None = None) -> None:
         self.file_list.blockSignals(True)
         self.file_list.clear()
 
@@ -238,16 +240,34 @@ class LabelingMainWindow(QMainWindow):
             item.setToolTip(image_path)
             self.file_list.addItem(item)
 
-        self.file_list.blockSignals(False)
-
         if not self.current_images:
+            self.file_list.blockSignals(False)
             return
+
+        selected_paths = [path for path in (preferred_paths or []) if path in self.current_images]
+        if selected_paths:
+            selection_model = self.file_list.selectionModel()
+            for path in selected_paths:
+                row = self.current_images.index(path)
+                model_index = self.file_list.model().index(row, 0)
+                selection_model.select(model_index, QItemSelectionModel.SelectionFlag.Select)
 
         if preferred_path and preferred_path in self.current_images:
             selected_index = self.current_images.index(preferred_path)
+        elif selected_paths:
+            selected_index = self.current_images.index(selected_paths[0])
         else:
             selected_index = min(self.current_index, len(self.current_images) - 1)
-        self.file_list.setCurrentRow(selected_index)
+
+        selection_model = self.file_list.selectionModel()
+        current_model_index = self.file_list.model().index(selected_index, 0)
+        selection_model.setCurrentIndex(current_model_index, QItemSelectionModel.SelectionFlag.NoUpdate)
+        if not selected_paths:
+            selection_model.select(current_model_index, QItemSelectionModel.SelectionFlag.Select)
+
+        self.current_index = selected_index
+        self.file_list.blockSignals(False)
+        self._load_current_image()
 
     def _on_file_changed(self, current: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
         if current is None or not self.current_images:
@@ -317,7 +337,15 @@ class LabelingMainWindow(QMainWindow):
     def apply_label(self, label: str) -> None:
         if not self.current_images:
             return
-        image_path = self.current_images[self.current_index]
+
+        selected_paths = self._selected_image_paths()
+        if len(selected_paths) > 1:
+            self._apply_label_bulk(selected_paths, label)
+            return
+
+        image_path = selected_paths[0] if selected_paths else self.current_images[self.current_index]
+        if image_path in self.current_images:
+            self.current_index = self.current_images.index(image_path)
         previous_label = self.session.get_label(image_path)
         self.session.set_label(image_path, label)
         self._update_labeled_count(previous_label, label)
@@ -339,7 +367,15 @@ class LabelingMainWindow(QMainWindow):
     def unlabel_current(self) -> None:
         if not self.current_images:
             return
-        image_path = self.current_images[self.current_index]
+
+        selected_paths = self._selected_image_paths()
+        if len(selected_paths) > 1:
+            self._unlabel_bulk(selected_paths)
+            return
+
+        image_path = selected_paths[0] if selected_paths else self.current_images[self.current_index]
+        if image_path in self.current_images:
+            self.current_index = self.current_images.index(image_path)
         previous_label = self.session.get_label(image_path)
         self.session.unlabel(image_path)
         self._update_labeled_count(previous_label, None)
@@ -351,6 +387,111 @@ class LabelingMainWindow(QMainWindow):
         else:
             self._refresh_file_list(preferred_path=image_path)
         self._refresh_progress()
+
+    def _unlabel_bulk(self, selected_paths: list[str]) -> None:
+        if not selected_paths:
+            return
+
+        previous_labels = {path: self.session.get_label(path) for path in selected_paths}
+        paths_to_unlabel = [path for path in selected_paths if previous_labels[path] in VALID_LABELS]
+        if paths_to_unlabel:
+            self.session.unlabel_bulk(paths_to_unlabel)
+            for path in paths_to_unlabel:
+                self._update_labeled_count(previous_labels[path], None)
+
+        self._refresh_day_list()
+        self.current_images = self._visible_images(self.current_day)
+
+        if not self.current_images:
+            self._render_empty_day(self.current_day or "")
+            self._refresh_file_list(preferred_path=None, preferred_paths=None)
+            self._refresh_progress()
+            return
+
+        visible_selected_paths = [path for path in selected_paths if path in self.current_images]
+        if visible_selected_paths:
+            preferred_path = visible_selected_paths[0]
+            preferred_paths = visible_selected_paths
+        else:
+            fallback_index = min(self.current_index, len(self.current_images) - 1)
+            preferred_path = self.current_images[fallback_index]
+            preferred_paths = None
+
+        self._refresh_file_list(preferred_path=preferred_path, preferred_paths=preferred_paths)
+        self._refresh_progress()
+
+    def _selected_image_paths(self) -> list[str]:
+        rows = sorted(
+            {
+                self.file_list.row(item)
+                for item in self.file_list.selectedItems()
+                if self.file_list.row(item) >= 0
+            }
+        )
+        selected_paths = [self.current_images[row] for row in rows if row < len(self.current_images)]
+        if selected_paths:
+            return selected_paths
+        if self.current_images:
+            return [self.current_images[self.current_index]]
+        return []
+
+    def _apply_label_bulk(self, selected_paths: list[str], label: str) -> None:
+        if not selected_paths:
+            return
+        if not self._confirm_bulk_overwrite(selected_paths):
+            return
+
+        previous_labels = {path: self.session.get_label(path) for path in selected_paths}
+        updates = {
+            path: label
+            for path in selected_paths
+            if previous_labels[path] != label
+        }
+        if updates:
+            self.session.set_labels_bulk(updates)
+            for path, new_label in updates.items():
+                self._update_labeled_count(previous_labels[path], new_label)
+
+        self._refresh_day_list()
+        self.current_images = self._visible_images(self.current_day)
+
+        if not self.current_images:
+            self._render_empty_day(self.current_day or "")
+            self._refresh_file_list(preferred_path=None, preferred_paths=None)
+            self._refresh_progress()
+            return
+
+        visible_selected_paths = [path for path in selected_paths if path in self.current_images]
+        if visible_selected_paths:
+            preferred_path = visible_selected_paths[0]
+            preferred_paths = visible_selected_paths
+        else:
+            fallback_index = min(self.current_index, len(self.current_images) - 1)
+            preferred_path = self.current_images[fallback_index]
+            preferred_paths = None
+
+        self._refresh_file_list(preferred_path=preferred_path, preferred_paths=preferred_paths)
+        self._refresh_progress()
+
+    def _confirm_bulk_overwrite(self, selected_paths: list[str]) -> bool:
+        labeled_count = sum(
+            1 for path in selected_paths if self.session.get_label(path) in VALID_LABELS
+        )
+        if labeled_count == 0:
+            return True
+        message = (
+            f"{len(selected_paths)} images selected.\n"
+            f"{labeled_count} already have a label.\n\n"
+            "Do you want to overwrite existing labels for this bulk action?"
+        )
+        choice = QMessageBox.question(
+            self,
+            "Confirm bulk overwrite",
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return choice == QMessageBox.StandardButton.Yes
 
     def _refresh_progress(self) -> None:
         total = len(self.index.all_images)

@@ -132,8 +132,28 @@ class LabelSession:
         self.labels[image_path] = label
         self.save()
 
+    def set_labels_bulk(self, updates: dict[str, str]) -> None:
+        if not updates:
+            return
+        for image_path, label in updates.items():
+            if label not in VALID_LABELS:
+                raise ValueError(f"Invalid label for {image_path}: {label}")
+            self.labels[image_path] = label
+        self.save()
+
     def unlabel(self, image_path: str) -> None:
         if image_path in self.labels:
             del self.labels[image_path]
+            self.save()
+
+    def unlabel_bulk(self, image_paths: list[str]) -> None:
+        if not image_paths:
+            return
+        changed = False
+        for image_path in image_paths:
+            if image_path in self.labels:
+                del self.labels[image_path]
+                changed = True
+        if changed:
             self.save()
 
