@@ -22,7 +22,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .data_store import LABEL_GHOST, LABEL_NON, LABEL_UNKNOWN, ImageIndex, LabelSession, index_images
+from .data_store import (
+    LABEL_GHOST,
+    LABEL_NON,
+    LABEL_UNKNOWN,
+    VALID_LABELS,
+    ImageIndex,
+    LabelSession,
+    index_images,
+)
 from .export_csv import export_labels_csv
 
 
@@ -35,6 +43,10 @@ class LabelingMainWindow(QMainWindow):
         self.index: ImageIndex = index_images(data_root)
         self.session = LabelSession(session_file, self.index.root_dir)
         self.default_output_csv = output_csv
+        self.index_image_set = set(self.index.all_images)
+        self.labeled_count = sum(
+            1 for image_path in self.index.all_images if self.session.get_label(image_path) in VALID_LABELS
+        )
 
         self.current_day: str | None = None
         self.current_images: list[str] = []
@@ -171,7 +183,7 @@ class LabelingMainWindow(QMainWindow):
         self.day_list.setCurrentRow(best_day_index)
 
     def _day_labeled_count(self, day: str) -> int:
-        return sum(1 for path in self.index.by_day[day] if self.session.get_label(path))
+        return sum(1 for path in self.index.by_day[day] if self.session.get_label(path) in VALID_LABELS)
 
     def _visible_images(self, day: str) -> list[str]:
         paths = self.index.by_day[day]
@@ -306,7 +318,9 @@ class LabelingMainWindow(QMainWindow):
         if not self.current_images:
             return
         image_path = self.current_images[self.current_index]
+        previous_label = self.session.get_label(image_path)
         self.session.set_label(image_path, label)
+        self._update_labeled_count(previous_label, label)
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
 
@@ -326,7 +340,9 @@ class LabelingMainWindow(QMainWindow):
         if not self.current_images:
             return
         image_path = self.current_images[self.current_index]
+        previous_label = self.session.get_label(image_path)
         self.session.unlabel(image_path)
+        self._update_labeled_count(previous_label, None)
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
         if not self.current_images:
@@ -338,9 +354,16 @@ class LabelingMainWindow(QMainWindow):
 
     def _refresh_progress(self) -> None:
         total = len(self.index.all_images)
-        labeled = sum(1 for path in self.index.all_images if self.session.get_label(path))
-        remaining = total - labeled
-        self.statusBar().showMessage(f"Labeled {labeled}/{total} | Remaining {remaining}")
+        remaining = total - self.labeled_count
+        self.statusBar().showMessage(f"Labeled {self.labeled_count}/{total} | Remaining {remaining}")
+
+    def _update_labeled_count(self, previous_label: str | None, new_label: str | None) -> None:
+        was_labeled = previous_label in VALID_LABELS
+        is_labeled = new_label in VALID_LABELS
+        if not was_labeled and is_labeled:
+            self.labeled_count += 1
+        elif was_labeled and not is_labeled:
+            self.labeled_count -= 1
 
     def export_csv(self) -> None:
         suggested = str(self.default_output_csv.expanduser().resolve())
@@ -353,11 +376,20 @@ class LabelingMainWindow(QMainWindow):
         if not selected:
             return
 
-        count = export_labels_csv(self.session.labels, Path(selected))
+        current_labels = {
+            path: label
+            for path, label in self.session.labels.items()
+            if path in self.index_image_set
+        }
+        count = export_labels_csv(current_labels, Path(selected))
+        skipped = len(self.session.labels) - len(current_labels)
+        details = f"Exported {count} labeled images to:\n{selected}"
+        if skipped > 0:
+            details += f"\n\nSkipped {skipped} labels not in current indexed dataset."
         QMessageBox.information(
             self,
             "Export complete",
-            f"Exported {count} labeled images to:\n{selected}",
+            details,
         )
 
 

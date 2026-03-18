@@ -95,8 +95,14 @@ class LabelSession:
         if not self.session_path.exists():
             return
 
-        with self.session_path.open("r", encoding="utf-8") as handle:
-            raw = json.load(handle)
+        try:
+            with self.session_path.open("r", encoding="utf-8") as handle:
+                raw = json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            # Keep startup resilient: treat unreadable/corrupt session files
+            # as an empty labeling state.
+            self.labels = {}
+            return
 
         labels = raw.get("labels", {})
         if not isinstance(labels, dict):

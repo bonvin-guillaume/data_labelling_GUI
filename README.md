@@ -81,6 +81,7 @@ filepath,label
 ```
 
 Only labeled images are exported.
+If your session contains old labels from a different dataset root, those rows are skipped automatically.
 
 ## Notes
 
