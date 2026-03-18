@@ -52,7 +52,7 @@ python app.py --data-root "/Volumes/KHO/Sony/2024/12"
 ```
 
 Optional arguments:
-- `--session-file "/path/to/session.json"` (default: `.ghost_label_session.json`)
+- `--session-file "/path/to/session.json"` (optional override; otherwise uses `<data_root>/.ghost_label_session.json` when writable, or a per-folder file under `~/.ghost_label_sessions/`)
 - `--output-csv "/path/to/ghost_aurora_labels.csv"` (default: `ghost_aurora_labels.csv`)
 
 ## 3) Labeling workflow
@@ -95,5 +95,6 @@ If your session contains old labels from a different dataset root, those rows ar
 ## Notes
 
 - Supported image extensions: `.jpg`, `.jpeg`, `.png`
-- If you close the app, you can resume later by launching with the same `--session-file`.
+- By default, each opened `data_root` keeps its own session file. The app uses `<data_root>/.ghost_label_session.json` when writable, otherwise it uses a writable per-folder fallback under `~/.ghost_label_sessions/`.
+- If you close the app, you can resume later by reopening the same folder/date (or by launching with the same `--session-file`).
 - The app uses `labelling_app.png` as logo/icon with rounded corners (falls back to built-in logo if file is missing).
