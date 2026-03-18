@@ -3,6 +3,7 @@
 Desktop application to manually label all-sky camera images as either:
 - `GHOST-aurora`
 - `non-GHOST-aurora`
+- `Unknown`
 
 The app supports:
 - one folder per day directly under `data_root`, or
@@ -61,6 +62,7 @@ Optional arguments:
 - Apply labels with:
   - `1` -> `non-GHOST-aurora`
   - `2` -> `GHOST-aurora`
+  - `3` -> `Unknown`
   - `U` -> remove label
 - Enable **Show only unlabeled images** to speed up manual review.
 

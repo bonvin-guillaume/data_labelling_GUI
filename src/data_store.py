@@ -7,7 +7,8 @@ from pathlib import Path
 
 LABEL_GHOST = "GHOST-aurora"
 LABEL_NON = "non-GHOST-aurora"
-VALID_LABELS = {LABEL_GHOST, LABEL_NON}
+LABEL_UNKNOWN = "Unknown"
+VALID_LABELS = {LABEL_GHOST, LABEL_NON, LABEL_UNKNOWN}
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 

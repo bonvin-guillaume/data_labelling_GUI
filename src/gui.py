@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .data_store import LABEL_GHOST, LABEL_NON, ImageIndex, LabelSession, index_images
+from .data_store import LABEL_GHOST, LABEL_NON, LABEL_UNKNOWN, ImageIndex, LabelSession, index_images
 from .export_csv import export_labels_csv
 
 
@@ -113,6 +113,10 @@ class LabelingMainWindow(QMainWindow):
         self.non_button.clicked.connect(lambda: self.apply_label(LABEL_NON))
         controls.addWidget(self.non_button)
 
+        self.unknown_button = QPushButton("Label Unknown [3]")
+        self.unknown_button.clicked.connect(lambda: self.apply_label(LABEL_UNKNOWN))
+        controls.addWidget(self.unknown_button)
+
         self.ghost_button = QPushButton("Label GHOST [2]")
         self.ghost_button.clicked.connect(lambda: self.apply_label(LABEL_GHOST))
         controls.addWidget(self.ghost_button)
@@ -134,6 +138,7 @@ class LabelingMainWindow(QMainWindow):
         QShortcut(QKeySequence("Right"), self, activated=self.next_image)
         QShortcut(QKeySequence("1"), self, activated=lambda: self.apply_label(LABEL_NON))
         QShortcut(QKeySequence("2"), self, activated=lambda: self.apply_label(LABEL_GHOST))
+        QShortcut(QKeySequence("3"), self, activated=lambda: self.apply_label(LABEL_UNKNOWN))
         QShortcut(QKeySequence("U"), self, activated=self.unlabel_current)
 
     def _refresh_day_list(self) -> None:
@@ -211,6 +216,8 @@ class LabelingMainWindow(QMainWindow):
                 text = f"[G] {file_name}"
             elif label == LABEL_NON:
                 text = f"[N] {file_name}"
+            elif label == LABEL_UNKNOWN:
+                text = f"[?] {file_name}"
             else:
                 text = f"[ ] {file_name}"
 
