@@ -92,6 +92,7 @@ class LabelingMainWindow(QMainWindow):
         self.show_unknown_box = QCheckBox("Show Unknown")
         self.show_unknown_box.toggled.connect(self._on_filter_changed)
         left_layout.addWidget(self.show_unknown_box)
+        self._refresh_filter_labels()
 
         left_layout.addWidget(QLabel("Files in selected day"))
         self.file_list = QListWidget()
@@ -230,6 +231,30 @@ class LabelingMainWindow(QMainWindow):
             filters.add("unknown")
         return filters
 
+    def _current_day_category_counts(self) -> dict[str, int]:
+        counts = {"unlabeled": 0, "non": 0, "ghost": 0, "unknown": 0}
+        if not self.current_day or self.current_day not in self.index.by_day:
+            return counts
+
+        for path in self.index.by_day[self.current_day]:
+            label = self.session.get_label(path)
+            if label is None:
+                counts["unlabeled"] += 1
+            elif label == LABEL_NON:
+                counts["non"] += 1
+            elif label == LABEL_GHOST:
+                counts["ghost"] += 1
+            elif label == LABEL_UNKNOWN:
+                counts["unknown"] += 1
+        return counts
+
+    def _refresh_filter_labels(self) -> None:
+        counts = self._current_day_category_counts()
+        self.show_unlabeled_box.setText(f"Show Unlabeled [{counts['unlabeled']}]")
+        self.show_non_box.setText(f"Show Non-GHOST [{counts['non']}]")
+        self.show_ghost_box.setText(f"Show GHOST [{counts['ghost']}]")
+        self.show_unknown_box.setText(f"Show Unknown [{counts['unknown']}]")
+
     def _on_day_changed(self, current: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
         if current is None:
             return
@@ -244,6 +269,7 @@ class LabelingMainWindow(QMainWindow):
 
     def _select_day(self, day: str, preferred_path: str | None) -> None:
         self.current_day = day
+        self._refresh_filter_labels()
         self.current_images = self._visible_images(day)
 
         if not self.current_images:
@@ -388,6 +414,7 @@ class LabelingMainWindow(QMainWindow):
         self._update_labeled_count(previous_label, label)
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
+        self._refresh_filter_labels()
 
         if self.show_unlabeled_box.isChecked() and not (
             self.show_non_box.isChecked()
@@ -422,6 +449,7 @@ class LabelingMainWindow(QMainWindow):
         self._update_labeled_count(previous_label, None)
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
+        self._refresh_filter_labels()
         if not self.current_images:
             self._render_empty_day(self.current_day or "")
             self._refresh_file_list(preferred_path=None)
@@ -442,6 +470,7 @@ class LabelingMainWindow(QMainWindow):
 
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
+        self._refresh_filter_labels()
 
         if not self.current_images:
             self._render_empty_day(self.current_day or "")
@@ -495,6 +524,7 @@ class LabelingMainWindow(QMainWindow):
 
         self._refresh_day_list()
         self.current_images = self._visible_images(self.current_day)
+        self._refresh_filter_labels()
 
         if not self.current_images:
             self._render_empty_day(self.current_day or "")
