@@ -125,13 +125,13 @@ class LabelingMainWindow(QMainWindow):
         self.non_button.clicked.connect(lambda: self.apply_label(LABEL_NON))
         controls.addWidget(self.non_button)
 
-        self.unknown_button = QPushButton("Label Unknown [3]")
-        self.unknown_button.clicked.connect(lambda: self.apply_label(LABEL_UNKNOWN))
-        controls.addWidget(self.unknown_button)
-
         self.ghost_button = QPushButton("Label GHOST [2]")
         self.ghost_button.clicked.connect(lambda: self.apply_label(LABEL_GHOST))
         controls.addWidget(self.ghost_button)
+
+        self.unknown_button = QPushButton("Label Unknown [3]")
+        self.unknown_button.clicked.connect(lambda: self.apply_label(LABEL_UNKNOWN))
+        controls.addWidget(self.unknown_button)
 
         self.unlabel_button = QPushButton("Unlabel [U]")
         self.unlabel_button.clicked.connect(self.unlabel_current)
