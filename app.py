@@ -32,16 +32,6 @@ def parse_args() -> argparse.Namespace:
         help="Local root directory containing day folders (or nested year/month/day folders).",
     )
     parser.add_argument(
-        "--session-file",
-        type=Path,
-        default=None,
-        help=(
-            "Optional path to session JSON used for autosave/resume. "
-            "If omitted, defaults to <data_root>/.ghost_label_session.json "
-            "(or a writable per-folder fallback under ~/.ghost_label_sessions)."
-        ),
-    )
-    parser.add_argument(
         "--output-csv",
         type=Path,
         default=Path("ghost_aurora_labels.csv"),
@@ -61,10 +51,8 @@ def main() -> int:
         )
 
     data_root = Path(args.data_root).expanduser().resolve()
-    if args.session_file is not None:
-        session_file = args.session_file.expanduser().resolve()
-    else:
-        session_file = _default_session_file_for_data_root(data_root).expanduser().resolve()
+    session_file = _default_session_file_for_data_root(data_root).expanduser().resolve()
+    print(f"Session file: {session_file}")
     output_csv = args.output_csv.expanduser().resolve()
     return run_app(
         data_root=data_root,
